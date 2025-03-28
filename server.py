@@ -20,9 +20,6 @@ from wcferry import Wcf
 from model import *
 # 用于密码哈希的上下文
 
-logging.basicConfig(level='DEBUG', format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-LOG = logging.getLogger("Demo")
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -100,12 +97,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
+logging.basicConfig(level='DEBUG', format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+LOG = logging.getLogger("Demo")
 
 def forward_msg(msg):
     urls = Config().get_config("forward_url")
     payload = json.dumps(msg)
     headers = {
-       'User-Agent': 'abc',
+       'User-Agent': 'txb',
        'Content-Type': 'application/json'
     }
     for url in urls:

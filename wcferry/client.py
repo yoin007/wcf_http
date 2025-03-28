@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-__version__ = "39.4.1.0"
+__version__ = "39.4.4.0"
 
 import atexit
 import base64
@@ -10,6 +10,7 @@ import logging
 import mimetypes
 import os
 import re
+import shutil
 import subprocess
 import sys
 from queue import Queue
@@ -106,8 +107,7 @@ class Wcf():
         self._is_running = True
         self.contacts = []
         self.msgQ = Queue()
-        self._SQL_TYPES = {1: int, 2: float, 3: lambda x: x.decode(
-            "utf-8"), 4: bytes, 5: lambda x: None}
+        self._SQL_TYPES = {1: int, 2: float, 3: lambda x: x.decode("utf-8"), 4: bytes, 5: lambda x: None}
         self.self_wxid = ""
         if block:
             self.LOG.info("等待微信登录...")
@@ -409,7 +409,6 @@ class Wcf():
         Returns:
             int: 0 为成功，其他失败
         """
-        raise Exception("Not implemented, yet")
         req = wcf_pb2.Request()
         req.func = wcf_pb2.FUNC_SEND_XML  # FUNC_SEND_XML
         req.xml.receiver = receiver
@@ -647,7 +646,6 @@ class Wcf():
         Returns:
             int: 1 为成功，其他失败
         """
-        raise Exception("Not implemented, yet")
         req = wcf_pb2.Request()
         req.func = wcf_pb2.FUNC_ACCEPT_FRIEND  # FUNC_ACCEPT_FRIEND
         req.v.v3 = v3
@@ -668,9 +666,9 @@ class Wcf():
         friends = []
         for cnt in self.get_contacts():
             if (cnt["wxid"].endswith("@chatroom") or    # 群聊
-                cnt["wxid"].startswith("gh_") or    # 公众号
-                cnt["wxid"] in not_friends.keys()   # 其他杂号
-                ):
+                        cnt["wxid"].startswith("gh_") or    # 公众号
+                        cnt["wxid"] in not_friends.keys()   # 其他杂号
+                    ):
                 continue
             friends.append(cnt)
 
@@ -728,65 +726,6 @@ class Wcf():
         req.att.extra = extra
         rsp = self._send_request(req)
         return rsp.status
-
-    def download_file(self, id: int, extra: str, dst: str, timeout: int = 30) -> str:
-        """下载文件
-
-        Args:
-            id (int): 消息中 id
-            extra (str): 消息中的 extra
-            dst (str): 存放文件的路径（目录不存在会出错）,注意直接包含`文件名`！
-            timeout (int): 超时时间（秒）
-
-        Returns:
-            str: 成功返回存储路径；空字符串为失败，原因见日志。
-        """
-        if not os.path.exists(extra):
-            if self.download_attach(id, "", extra) != 0:
-                self.LOG.error(f"下载失败1:extra文件不存在")
-                return ""
-
-        cnt = 0
-        while cnt < timeout:
-            if os.path.exists(extra):
-                break
-            else:
-                sleep(1)
-            cnt += 1
-
-        if not os.path.exists(extra):
-            self.LOG.error(f"下载失败2:文件下载超时")
-            return ''
-
-        # f_name = extra.split('/')[-1]
-        # if dst[-1] == '/':
-        #     dst = dst + f_name
-        # else:
-        #     dst = dst + '/' + f_name
-        if os.path.exists(dst):
-            # print('dst', dst)
-            self.LOG.error(f'下载的文件已存在')
-            return ''
-
-        import shutil
-        try:
-            path = shutil.copy(extra, dst)
-            cnt = 0
-            while cnt < timeout:
-                if os.path.exists(dst):
-                    break
-                else:
-                    sleep(1)
-                cnt += 1
-            # print(f"copy_file:{extra}--{dst}")
-            if os.path.exists(dst):
-                return path
-            else:
-                self.LOG.error(f"下载失败3:文件复制超时")
-                return ''
-        except Exception as Err:
-            self.LOG.error(Err)
-            return ''
 
     def get_info_by_wxid(self, wxid: str) -> dict:
         """通过 wxid 查询微信号昵称等信息
@@ -904,7 +843,8 @@ class Wcf():
         Returns:
             str: 成功返回存储路径；空字符串为失败，原因见日志。
         """
-        if self.download_attach(id, "", extra) != 0:
+        sleep(1) # 强制等待 1 秒让数据入库，避免那帮人总是嗷嗷叫超时
+        if (not os.path.exists(extra)) and (self.download_attach(id, "", extra) != 0):
             self.LOG.error(f"下载失败")
             return ""
         cnt = 0
@@ -912,6 +852,40 @@ class Wcf():
             path = self.decrypt_image(extra, dir)
             if path:
                 return path
+            sleep(1)
+            cnt += 1
+
+        self.LOG.error(f"下载超时")
+        return ""
+
+    def download_video(self, id: int, thumb: str, dir: str, timeout: int = 30) -> str:
+        """下载视频
+
+        Args:
+            id (int): 消息中 id
+            thumb (str): 消息中的 thumb（即视频的封面图）
+            dir (str): 存放视频的目录（目录不存在会出错）
+            timeout (int): 超时时间（秒）
+
+        Returns:
+            str: 成功返回存储路径；空字符串为失败，原因见日志。
+        """
+        sleep(1) # 强制等待 1 秒让数据入库，避免那帮人总是嗷嗷叫超时
+        base, _ = os.path.splitext(thumb)
+        file_path = base + ".mp4"
+        file_name = os.path.basename(file_path)
+        target_path = os.path.join(dir, file_name)
+        if (not os.path.exists(target_path)) and (not os.path.exists(file_path)) and (self.download_attach(id, thumb, "") != 0):
+            self.LOG.error(f"下载失败")
+            return ""
+
+        cnt = 0
+        while cnt < timeout:
+            if os.path.exists(file_path):
+                os.makedirs(dir, exist_ok=True)
+                shutil.move(file_path, target_path)
+                return target_path
+
             sleep(1)
             cnt += 1
 
@@ -979,12 +953,9 @@ class Wcf():
             Dict: 群成员列表: {wxid1: 昵称1, wxid2: 昵称2, ...}
         """
         members = {}
-        contacts = self.query_sql(
-            "MicroMsg.db", "SELECT UserName, NickName FROM Contact;")
-        contacts = {contact["UserName"]: contact["NickName"]
-                    for contact in contacts}
-        crs = self.query_sql(
-            "MicroMsg.db", f"SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '{roomid}';")
+        contacts = self.query_sql("MicroMsg.db", "SELECT UserName, NickName FROM Contact;")
+        contacts = {contact["UserName"]: contact["NickName"]for contact in contacts}
+        crs = self.query_sql("MicroMsg.db", f"SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '{roomid}';")
         if not crs:
             return members
 
@@ -998,8 +969,7 @@ class Wcf():
             return members
 
         for member in crd.members:
-            members[member.wxid] = member.name if member.name else contacts.get(
-                member.wxid, "")
+            members[member.wxid] = member.name if member.name else contacts.get(member.wxid, "")
 
         return members
 
@@ -1013,15 +983,13 @@ class Wcf():
         Returns:
             str: 群名片
         """
-        nickname = self.query_sql(
-            "MicroMsg.db", f"SELECT NickName FROM Contact WHERE UserName = '{wxid}';")
+        nickname = self.query_sql("MicroMsg.db", f"SELECT NickName FROM Contact WHERE UserName = '{wxid}';")
         if not nickname:
             return ""
 
         nickname = nickname[0].get("NickName", "")
 
-        crs = self.query_sql(
-            "MicroMsg.db", f"SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '{roomid}';")
+        crs = self.query_sql("MicroMsg.db", f"SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '{roomid}';")
         if not crs:
             return ""
 

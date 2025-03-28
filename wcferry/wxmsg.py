@@ -33,7 +33,7 @@ class WxMsg():
         self.content = msg.content
         self.thumb = msg.thumb
         self.extra = msg.extra
-    
+
     def __to_dict__(self):
         return {
             'is_self': self._is_self,
