@@ -30,9 +30,23 @@ class RichText(BaseModel):
     thumburl: str
     receiver: str
 
+class XmlMsg(BaseModel):
+    receiver: str
+    xml: str
+    type: int
+    path: Optional[str] = None
+
 class WxidRoom(BaseModel):
     roomid: str
     wxid: str
+
+class Wxid(BaseModel):
+    wxid: str
+
+class Friend(BaseModel):
+    v3: str
+    v4: str
+    scene: Optional[int] = 30
 
 class ForwardMsg(BaseModel):
     id: int

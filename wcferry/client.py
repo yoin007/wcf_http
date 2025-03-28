@@ -254,7 +254,6 @@ class Wcf():
         req.func = wcf_pb2.FUNC_GET_USER_INFO  # FUNC_GET_USER_INFO
         rsp = self._send_request(req)
         ui = json_format.MessageToDict(rsp.ui)
-
         return ui
 
     def get_audio_msg(self, id: int, dir: str, timeout: int = 3) -> str:
@@ -857,6 +856,58 @@ class Wcf():
 
         self.LOG.error(f"下载超时")
         return ""
+
+    def download_file(self, id: int, extra: str, dst: str, timeout: int = 30) -> str:
+        """下载文件
+
+        Args:
+            id (int): 消息中 id
+            extra (str): 消息中的 extra
+            dst (str): 存放文件的路径（目录不存在会出错）,注意直接包含`文件名`！
+            timeout (int): 超时时间（秒）
+
+        Returns:
+            str: 成功返回存储路径；空字符串为失败，原因见日志。
+        """
+        sleep(1)
+        if not os.path.exists(extra) and(self.download_attach(id, "", extra)!= 0):
+            self.LOG.error(f"下载失败1:extra文件不存在")
+            return ""
+        cnt = 0
+        while cnt<timeout:
+            if os.path.exists(extra):
+                break
+            else:
+                sleep(1)
+            cnt += 1
+
+        if not os.path.exists(extra):
+            self.LOG.error(f"下载失败2:文件下载超时")
+            return ''
+
+        if os.path.exists(dst):
+            self.LOG.error(f'下载的文件已存在')
+            return ''
+        
+        import shutil
+        try:
+            path = shutil.copy(extra, dst)
+            cnt = 0
+            while cnt<timeout:
+                if os.path.exists(dst):
+                    break
+                else:
+                    sleep(1)
+                cnt += 1
+            # print(f"copy_file:{extra}--{dst}")
+            if os.path.exists(dst):
+                return path
+            else:
+                self.LOG.error(f"下载失败3:文件复制超时")
+                return ''
+        except Exception as Err:
+            self.LOG.error(Err)
+            return ''
 
     def download_video(self, id: int, thumb: str, dir: str, timeout: int = 30) -> str:
         """下载视频

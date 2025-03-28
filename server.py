@@ -15,7 +15,6 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, oa
 import jwt
 from passlib.context import CryptContext
 from config import Config
-# from temp import SECRET_KEY
 from wcferry import Wcf
 from model import *
 # 用于密码哈希的上下文
@@ -157,16 +156,11 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     )
     print(access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
-    # return {"access_token": access_token, "token_type": "bearer", "expires_in": access_token_expires}
 
 
 @app.get('/islogin')
 async def is_login(current_user: User = Depends(get_current_user)) -> bool:
     return wcf.is_login()
-
-@app.get('/is_receiving_msg')
-async def is_receiving_msg(current_user: User = Depends(get_current_user)) -> bool:
-    return wcf.is_receiving_msg()
 
 @app.get('/get_self_wxid')
 async def get_self_wxid(current_user: User = Depends(get_current_user)) -> str:
@@ -188,13 +182,13 @@ async def get_dbs(current_user: User = Depends(get_current_user)) -> List[str]:
 async def get_tables(db: str, current_user: User = Depends(get_current_user)) -> List[Dict]:
     return wcf.get_tables(db)
 
+@app.get('/is_receiving_msg')
+async def is_receiving_msg(current_user: User = Depends(get_current_user)) -> bool:
+    return wcf.is_receiving_msg()
+
 @app.get('/get_user_info')
 async def get_user_info(current_user: User = Depends(get_current_user)) -> Dict:
     return wcf.get_user_info()
-
-@app.get('/friends')
-async def get_friends(current_user: User = Depends(get_current_user)) -> List[Dict]:
-    return wcf.get_friends()
 
 @app.post('/get_audio_msg')
 async def get_audio_msg(audio: AudioMsg, current_user: User = Depends(get_current_user)) -> str:
@@ -245,6 +239,14 @@ async def send_file(file: FileMsg, current_user: User = Depends(get_current_user
     """
     return wcf.send_file(file.path, file.receiver)
 
+@app.post('/xml')
+async def send_xml(xml: XmlMsg, current_user: User = Depends(get_current_user))->int:
+    return wcf.send_xml(xml.receiver, xml.xml, xml.type, xml.path)
+
+@app.post('/emotion')
+async def send_emotion(path: str, receiver: str, current_user: User = Depends(get_current_user))->int:
+    return wcf.send_emotion(path, receiver)
+
 @app.post('/rich-text')
 async def send_rich_text(rich_text: RichText, current_user: User = Depends(get_current_user))->int:
     return wcf.send_rich_text(rich_text.name, rich_text.account, rich_text.title, rich_text.digest, rich_text.url, rich_text.thumburl, rich_text.receiver)
@@ -272,6 +274,14 @@ async def disable_receiving_msg(current_user: User = Depends(get_current_user))-
 async def query_sql(sql: SqlMsg, current_user: User = Depends(get_current_user))->List[Dict]:
     return wcf.query_sql(sql.db, sql.sql)
 
+@app.post('/new_friend')
+async def accept_new_friend(friend: Friend, current_user: User = Depends(get_current_user))->int:
+    return wcf.accept_new_friend(friend.v3, friend.v4, friend.scene)
+
+@app.get('/friends')
+async def get_friends(current_user: User = Depends(get_current_user)) -> List[Dict]:
+    return wcf.get_friends()
+
 @app.post('/receive-transfer')
 async def receive_transfer(transfer: TransferMsg, current_user: User = Depends(get_current_user))->int:
     return wcf.receive_transfer(transfer.wxid, transfer.transferid, transfer.transactionid)
@@ -279,6 +289,15 @@ async def receive_transfer(transfer: TransferMsg, current_user: User = Depends(g
 @app.get('/pyq/{id}')
 async def refresh_pyq(id: int, current_user: User = Depends(get_current_user))->int:
     return wcf.refresh_pyq(id)
+
+@app.post('/wxid_info')
+async def get_wxid_info(wxid: Wxid, current_user: User = Depends(get_current_user))->Dict:
+    return wcf.get_info_by_wxid(wxid.wxid)
+
+@app.get('/revoke-msg/{id}')
+async def revoke_msg(id: int, current_user: User = Depends(get_current_user))->int:
+    """该方法暂时 未实现"""
+    return wcf.revoke_msg(int(id))
 
 @app.post('/save-image')
 async def save_image(image: DownloadFile, current_user: User = Depends(get_current_user))->str:
@@ -298,10 +317,9 @@ async def download_file(file: DownloadFile, current_user: User = Depends(get_cur
     """
     return wcf.download_file(file.id, file.extra, file.dst, file.timeout)
 
-@app.get('/revoke-msg/{id}')
-async def revoke_msg(id: int, current_user: User = Depends(get_current_user))->int:
-    """该方法暂时 未实现"""
-    return wcf.revoke_msg(int(id))
+@app.post('/save-video')
+async def save_video(id: int, thumb: str, timeout: int = 30, current_user: User = Depends(get_current_user))->str:
+    return wcf.download_video(id, thumb, timeout)
 
 @app.post('/add-chatroom-member')
 async def add_chatroom_member(chatroom: WxidRoom, current_user: User = Depends(get_current_user))->int:
@@ -322,21 +340,6 @@ async def query_chatroom_member(roomid: str, current_user: User = Depends(get_cu
 @app.post('/alias')
 async def get_alias(user: WxidRoom, current_user: User = Depends(get_current_user))->str:
     return wcf.get_alias_in_chatroom(user.wxid, user.roomid)
-
-# @app.post('/delete-file')
-# async def delete_file(path: str, token: str) ->str:
-#     if token == Config().get_config('delete_token'):
-#         try:
-#             os.remove(path)
-#             return path
-#         except FileNotFoundError:
-#             return f'{path}文件未找到'
-#         except PermissionError:
-#             return f'{path}没有权限删除文件,请手动删除'
-#         except Exception as e:
-#             return f'删除{path}出错，{e}'
-
-
 
 
 if __name__ == "__main__":
