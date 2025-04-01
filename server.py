@@ -274,7 +274,7 @@ async def disable_receiving_msg(current_user: User = Depends(get_current_user))-
 async def query_sql(sql: SqlMsg, current_user: User = Depends(get_current_user))->List[Dict]:
     return wcf.query_sql(sql.db, sql.sql)
 
-@app.post('/new_friend')
+@app.post('/accept-new-friend')
 async def accept_new_friend(friend: Friend, current_user: User = Depends(get_current_user))->int:
     return wcf.accept_new_friend(friend.v3, friend.v4, friend.scene)
 
