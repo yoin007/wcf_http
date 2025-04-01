@@ -863,50 +863,53 @@ class Wcf():
         Args:
             id (int): 消息中 id
             extra (str): 消息中的 extra
-            dst (str): 存放文件的路径（目录不存在会出错）,注意直接包含`文件名`！
+            dst (str): 存放文件的路径（目录不存在会自动创建）,注意直接包含`文件名`！
             timeout (int): 超时时间（秒）
 
         Returns:
             str: 成功返回存储路径；空字符串为失败，原因见日志。
         """
-        sleep(1)
-        if not os.path.exists(extra) and(self.download_attach(id, "", extra)!= 0):
-            self.LOG.error(f"下载失败1:extra文件不存在")
-            return ""
-        cnt = 0
-        while cnt<timeout:
-            if os.path.exists(extra):
-                break
-            else:
-                sleep(1)
-            cnt += 1
-
-        if not os.path.exists(extra):
-            self.LOG.error(f"下载失败2:文件下载超时")
+        # 创建目标目录
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+        except Exception as e:
+            self.LOG.error(f"创建目标目录失败: {e}")
             return ''
 
+        # 检查目标文件是否已存在
         if os.path.exists(dst):
-            self.LOG.error(f'下载的文件已存在')
+            self.LOG.error(f'目标文件已存在: {dst}')
             return ''
-        
-        import shutil
+
+        # 下载文件
+        sleep(3)  # 等待数据入库
+        if not os.path.exists(extra):
+            if self.download_attach(id, "", extra) != 0:
+                self.LOG.error(f"下载文件失败: {extra}")
+                return ''
+            
+            # 等待文件下载完成
+            for _ in range(timeout):
+                if os.path.exists(extra):
+                    break
+                sleep(1)
+            else:
+                self.LOG.error(f"下载超时: {extra}")
+                return ''
+
+        # 复制文件到目标位置
         try:
             path = shutil.copy(extra, dst)
-            cnt = 0
-            while cnt<timeout:
+            # 等待文件复制完成
+            for _ in range(timeout):
                 if os.path.exists(dst):
-                    break
-                else:
-                    sleep(1)
-                cnt += 1
-            # print(f"copy_file:{extra}--{dst}")
-            if os.path.exists(dst):
-                return path
+                    return path
+                sleep(1)
             else:
-                self.LOG.error(f"下载失败3:文件复制超时")
+                self.LOG.error(f"文件复制超时: {dst}")
                 return ''
-        except Exception as Err:
-            self.LOG.error(Err)
+        except Exception as e:
+            self.LOG.error(f"文件复制失败: {e}")
             return ''
 
     def download_video(self, id: int, thumb: str, dir: str, timeout: int = 30) -> str:
